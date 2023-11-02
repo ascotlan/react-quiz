@@ -1,4 +1,5 @@
 import { useEffect, useReducer } from "react";
+
 import Header from "./components/Header";
 import Main from "./components/Main";
 import Loader from "./components/Loader";
@@ -8,6 +9,10 @@ import Question from "./components/Question";
 import NextButton from "./components/NextButton";
 import Progress from "./components/Progress";
 import FinishScreen from "./components/FinishScreen";
+import Timer from "./components/Timer";
+import Footer from "./components/Footer";
+
+const SECS_PER_QUESTION = 30;
 
 const initialState = {
   questions: [],
@@ -15,7 +20,8 @@ const initialState = {
   index: 0,
   answer: null,
   points: 0,
-  highscore: 0
+  highscore: 0,
+  secondsRemaining: null,
 };
 
 const ACTION = {
@@ -25,7 +31,8 @@ const ACTION = {
   NEW_ANSWER: "NEW_ANSWER",
   NEXT_QUESTION: "NEXT_QUESTION",
   FINISHED: "FINISHED",
-  RESTART: "RESTART"
+  RESTART: "RESTART",
+  TICK: "TICK",
 };
 
 function reducer(state, action) {
@@ -33,9 +40,16 @@ function reducer(state, action) {
     case ACTION.DATA_RECEIVED:
       return { ...state, questions: action.payload, status: "ready" };
     case ACTION.DATA_FAILED:
-      return { ...state, status: "error" };
+      return {
+        ...state,
+        status: "error",
+      };
     case ACTION.ACTIVE:
-      return { ...state, status: "active" };
+      return {
+        ...state,
+        status: "active",
+        secondsRemaining: state.questions?.length *  SECS_PER_QUESTION,
+      };
     case ACTION.NEW_ANSWER:
       const question = state.questions[state.index];
       return {
@@ -49,9 +63,27 @@ function reducer(state, action) {
     case ACTION.NEXT_QUESTION:
       return { ...state, index: state.index + 1, answer: null };
     case ACTION.FINISHED:
-        return { ...state, status: "finished", highscore: state.points > state.highscore ? state.points : state.highscore };
+      return {
+        ...state,
+        status: "finished",
+        highscore:
+          state.points > state.highscore ? state.points : state.highscore,
+      };
     case ACTION.RESTART:
-        return { ...state, status:"ready", points: 0, index: 0, answer: null };
+      return {
+        ...state,
+        status: "ready",
+        points: 0,
+        index: 0,
+        answer: null,
+        secondsRemaining: initialState.secondsRemaining,
+      };
+    case ACTION.TICK:
+      return {
+        ...state,
+        secondsRemaining: state.secondsRemaining - 1,
+        status: state.secondsRemaining === 0 ? "finished" : state.status,
+      };
     default:
       throw new Error(
         `Tried to reduce with unsupported action type: ${action.type}`
@@ -60,10 +92,10 @@ function reducer(state, action) {
 }
 
 function App() {
-  const [{ questions, status, index, answer, points, highscore }, dispatch] = useReducer(
-    reducer,
-    initialState
-  );
+  const [
+    { questions, status, index, answer, points, highscore, secondsRemaining },
+    dispatch,
+  ] = useReducer(reducer, initialState);
   const numQuestions = questions.length;
   const maxPossiblePoints = questions.reduce(
     (acc, curr) => acc + curr.points,
@@ -105,10 +137,31 @@ function App() {
               action={ACTION}
               answer={answer}
             />
-            <NextButton dispatch={dispatch} answer={answer} action={ACTION} index={index} numQuestions={numQuestions} />
+            <Footer>
+              <Timer
+                dispatch={dispatch}
+                action={ACTION}
+                secondsRemaining={secondsRemaining}
+              />
+              <NextButton
+                dispatch={dispatch}
+                answer={answer}
+                action={ACTION}
+                index={index}
+                numQuestions={numQuestions}
+              />
+            </Footer>
           </>
         )}
-        {status === "finished" && <FinishScreen points={points} maxPossiblePoints={maxPossiblePoints} highscore={highscore} dispatch={dispatch} action={ACTION}/>}
+        {status === "finished" && (
+          <FinishScreen
+            points={points}
+            maxPossiblePoints={maxPossiblePoints}
+            highscore={highscore}
+            dispatch={dispatch}
+            action={ACTION}
+          />
+        )}
       </Main>
     </div>
   );
